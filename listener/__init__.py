@@ -3,6 +3,7 @@ import platform
 import network
 import selectors
 import struct
+from typing import Callable
 
 from exception import SetupRequiredError, NotFoundError
 from logger import get_logger
@@ -79,7 +80,7 @@ class Listener:
                         self.sniffer_v6.bind(('::', 0, 0, self.interface_index))  # type: ignore
         self.is_setup = True
 
-    def start(self):
+    def start(self, handler: Callable[[bytes, str], None]):
         if not self.is_setup:
             logger.error('Listener must be set up before starting.')
             raise SetupRequiredError('Listener must be set up before starting.')
@@ -99,25 +100,4 @@ class Listener:
                 sock = key.fileobj
                 protocol = key.data
                 packet, addr = sock.recvfrom(65535)
-                self.handle_packet(packet, protocol)
-
-    def handle_packet(self, packet: bytes, protocol: str):
-        logger.debug(f'Received {len(packet)} bytes on protocol {protocol}')
-        if protocol == 'ipv4':
-            header = packet[:20]
-            iph = struct.unpack('!BBHHHBBH4s4s', header)
-            src_ip = socket.inet_ntoa(iph[8])
-            dst_ip = socket.inet_ntoa(iph[9])
-            proto = iph[6]
-            logger.info(
-                f'IPv4 Packet: {src_ip} -> {dst_ip}, Protocol: {proto}, length: {len(packet)}'
-            )
-        elif protocol == 'ipv6':
-            header = packet[:40]
-            ip6h = struct.unpack('!IHBB16s16s', header)
-            src_ip = socket.inet_ntop(socket.AF_INET6, ip6h[4])
-            dst_ip = socket.inet_ntop(socket.AF_INET6, ip6h[5])
-            proto = ip6h[2]
-            logger.info(
-                f'IPv6 Packet: {src_ip} -> {dst_ip}, Protocol: {proto}, length: {len(packet)}'
-            )
+                handler(packet, protocol)
