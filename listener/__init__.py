@@ -11,6 +11,7 @@ logger = get_logger(__name__)
 class Listener:
     def __init__(self, interface: str):
         self.interface = interface
+        self.interface_idx = -1
         self.sniffer = None
         self.sniffer_v6 = None
         self.mix_mode = False
@@ -23,6 +24,7 @@ class Listener:
         logger.info(f"Setting up listener on interface {self.interface}, platform: {platform.system()}")
         ipv4_address = network.get_local_ip(self.interface)  # type: ignore
         ipv6_address = None
+        self.interface_index = socket.if_nametoindex(self.interface)
         try:
             ipv6_address = network.get_local_ip(self.interface, ipv6=True)  # type: ignore
         except NotFoundError:
@@ -59,7 +61,7 @@ class Listener:
         else:
             self.sniffer.bind((ipv4_address, 0))  # type: ignore
             if self.sniffer_v6:
-                self.sniffer_v6.bind((ipv6_address, 0))  # type: ignore
+                self.sniffer_v6.bind((ipv6_address, 0, 0, self.interface_index))  # type: ignore
         self.is_setup = True
 
     def start(self):
