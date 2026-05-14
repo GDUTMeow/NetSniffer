@@ -17,3 +17,6 @@ wheels/
 
 # Tests
 test*
+
+# Logs
+logs/

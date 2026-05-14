@@ -4,7 +4,9 @@ import platform
 import network
 
 from exception import SetupRequiredError, NotFoundError
+from logger import get_logger
 
+logger = get_logger(__name__)
 
 class Listener:
     def __init__(self, interface: str):
@@ -18,6 +20,13 @@ class Listener:
 
     def setup(self):
         # Create a raw socket and bind it to the interface
+        logger.info(f"Setting up listener on interface {self.interface}, platform: {platform.system()}")
+        ipv4_address = network.get_local_ip(self.interface)  # type: ignore
+        ipv6_address = None
+        try:
+            ipv6_address = network.get_local_ip(self.interface, ipv6=True)  # type: ignore
+        except NotFoundError:
+            logger.warning("[!] No ipv6 address found, skipping ipv6 sniffer setup.")
         if platform.system() == "Linux":
             # Linux has AF_PACKET which can capture both IPv4 and IPv6
             self.sniffer = socket.socket(
@@ -29,35 +38,31 @@ class Listener:
             self.sniffer = socket.socket(
                 socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_IP
             )
-            try:
-                network.get_local_ip(ipv4=False, ipv6=True)  # type: ignore
+            if ipv6_address:
                 self.sniffer_v6 = socket.socket(
                     socket.AF_INET6, socket.SOCK_RAW, socket.IPPROTO_IPV6
                 )
-            except NotFoundError:
-                print("[!] No ipv6 address found, skipping ipv6 sniffer setup.")
         else:
             # Windows need to turn on ioctl mode
             self.sniffer = socket.socket(
                 socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_IP
             )
             self.sniffer.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
-            try:
-                network.get_local_ip(ipv4=False, ipv6=True)  # type: ignore
+            if ipv6_address:
                 self.sniffer_v6 = socket.socket(
                     socket.AF_INET6, socket.SOCK_RAW, socket.IPPROTO_IPV6
                 )
-            except NotFoundError:
-                print("[!] No ipv6 address found, skipping ipv6 sniffer setup.")
+                self.sniffer_v6.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
         # Bind sockets to interface
         if self.mix_mode:
             self.sniffer.bind((self.interface, 0))
         else:
-            self.sniffer.bind((network.get_local_ip(interface=self.interface), 0))  # type: ignore
+            self.sniffer.bind((ipv4_address, 0))  # type: ignore
             if self.sniffer_v6:
-                self.sniffer_v6.bind((network.get_local_ip(ipv4=False, interface=self.interface), 0))  # type: ignore
+                self.sniffer_v6.bind((ipv6_address, 0))  # type: ignore
         self.is_setup = True
 
     def start(self):
         if not self.is_setup:
+            logger.error("Listener must be set up before starting.")
             raise SetupRequiredError("Listener must be set up before starting.")
