@@ -30,8 +30,8 @@ class Listener:
         ipv4_address = network.get_local_ip(self.interface)  # type: ignore
         ipv6_address = None
         if platform.system() != "Windows":
-            self.interface_index = socket.if_nametoindex(self.interface)
-            logger.info(f"Interface {self.interface} index: {self.interface_index}")
+            self.interface_idx = socket.if_nametoindex(self.interface)
+            logger.info(f"Interface {self.interface} index: {self.interface_idx}")
         else:
             logger.warning("Windows does not support interface index, skipping.")
         try:
@@ -65,9 +65,9 @@ class Listener:
                     socket.AF_INET6, socket.SOCK_RAW, socket.IPPROTO_IPV6
                 )
         else:
-            # Windows need to turn on ioctl mode
+            # Windows also need 2 sockets
             logger.info(
-                f"Binding raw sockets for IPv4 and IPv6 on interface {self.interface} with addresses {ipv4_address}."
+                f"Binding raw sockets for IPv4 on interface {self.interface} with addresses {ipv4_address}."
             )
             self.sniffer = socket.socket(
                 socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_IP
@@ -86,21 +86,34 @@ class Listener:
         else:
             self.sniffer.bind((ipv4_address, 0))  # type: ignore
             if platform.system() == "Windows":
-                logger.info(f"Enabling promiscuous mode on Windows for IPv4 socket on interface {self.interface}.")
+                logger.info(f"Enabling promiscuous mode on Windows for IPv4 socket on interface {self.interface} with address {ipv4_address}.")
                 self.sniffer.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
                 if self.sniffer_v6:
-                    logger.info(f"Enabling promiscuous mode on Windows for IPv6 socket on interface {self.interface}.")
-                    self.sniffer_v6.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
-            if self.sniffer_v6:
-                try:
-                    self.sniffer_v6.bind((ipv6_address, 0, 0, self.interface_index))  # type: ignore
-                except OSError as e:
-                    if e.errno == 49:
-                        logger.warning(f"Triggered exception {e}.")
-                        logger.warning(
-                            f"Failed to bind IPv6 socket to interface {self.interface} with address {ipv6_address}, falling back to '::' with interface index {self.interface_index}."
-                        )
-                        self.sniffer_v6.bind(("::", 0, 0, self.interface_index))  # type: ignore
+                    logger.info(f"Enabling promiscuous mode on Windows for IPv6 socket on interface {self.interface} with address {ipv6_address}.")
+                    try:
+                        self.sniffer_v6.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
+                    except OSError as e:
+                        if e.errno == 22:
+                            logger.warning(f"Triggered exception {e}")
+                            logger.warning(
+                                f"Current Windows version does not allow enabling promiscuous mode on IPv6 sockets. IPv6 sniffer will not capture packets."
+                            )
+                            self.sniffer_v6.close()
+                            self.sniffer_v6 = None
+                        else:
+                            logger.error(f"Unexpected error enabling promiscuous mode on IPv6 socket: {e}(errno: {e.errno})")
+            else:
+                # MacOS
+                if self.sniffer_v6:
+                    try:
+                        self.sniffer_v6.bind((ipv6_address, 0, 0, self.interface_idx))  # type: ignore
+                    except OSError as e:
+                        if e.errno == 49:
+                            logger.warning(f"Triggered exception {e}.")
+                            logger.warning(
+                                f"Failed to bind IPv6 socket to interface {self.interface} with address {ipv6_address}, falling back to '::' with interface index {self.interface_idx}."
+                            )
+                            self.sniffer_v6.bind(("::", 0, 0, self.interface_idx))  # type: ignore
         self.is_setup = True
 
     def start(self, handler: Callable[[bytes, str], None]):
