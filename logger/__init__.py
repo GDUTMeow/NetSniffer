@@ -16,7 +16,7 @@ def _setup_global_logger():
 
     start_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-    log_format = "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {extra[name]}:{line} - {message}"
+    log_format = "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {extra[name]}:{function}:{line} - {message}"
 
     logger.remove()
 
