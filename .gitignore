@@ -14,3 +14,6 @@ wheels/
 
 # Mac Shit
 .DS_Store
+
+# Tests
+test*
