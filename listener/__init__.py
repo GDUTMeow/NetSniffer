@@ -43,7 +43,7 @@ class Listener:
                 f'Binding AF_PACKET socket to interface {self.interface} for mixed IPv4/IPv6 capture.'
             )
             self.sniffer = socket.socket(
-                socket.AF_PACKET,
+                socket.AF_PACKET,  # type: ignore
                 socket.SOCK_RAW,
                 socket.ntohs(0x0003),  # Raw data with Ethernet header
             )
@@ -88,18 +88,18 @@ class Listener:
                 logger.info(
                     f'Enabling promiscuous mode on Windows for IPv4 socket on interface {self.interface} with address {ipv4_address}.'
                 )
-                self.sniffer.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
+                self.sniffer.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)  # type: ignore
                 if self.sniffer_v6:
                     logger.info(
                         f'Enabling promiscuous mode on Windows for IPv6 socket on interface {self.interface} with address {ipv6_address}.'
                     )
                     try:
-                        self.sniffer_v6.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
+                        self.sniffer_v6.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)  # type: ignore
                     except OSError as e:
                         if e.errno == 22:
                             logger.warning(f'Triggered exception {e}')
                             logger.warning(
-                                f'Current Windows version does not allow enabling promiscuous mode on IPv6 sockets. IPv6 sniffer will not capture packets.'
+                                'Current Windows version does not allow enabling promiscuous mode on IPv6 sockets. IPv6 sniffer will not capture packets.'
                             )
                             self.sniffer_v6.close()
                             self.sniffer_v6 = None

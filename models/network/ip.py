@@ -1,7 +1,9 @@
 import struct
 import socket
+from dataclasses import dataclass
 
 
+@dataclass
 class IPv4Packet:
     version: int  # 4 bits
     head_length: int  # 4 bits
@@ -9,13 +11,13 @@ class IPv4Packet:
     length: int  # 16 bits
     identification: int  # 16 bits
     flags: int  # 3 bits
-    fregment_offset: int  # 13 bits
+    fragment_offset: int  # 13 bits
     ttl: int  # 8 bits
     protocol: int  # 8 bits
     checksum: int  # 16 bits
     src_ip: str  # 32 bits
     dst_ip: str  # 32 bits
-    payload: bytes | str  # IP 包的内容载荷
+    payload: bytes  # IP 包的内容载荷
 
     @classmethod
     def parse(cls, raw_data: bytes) -> 'IPv4Packet':
@@ -41,7 +43,7 @@ class IPv4Packet:
             length=length,
             identification=identification,
             flags=flags,
-            fregment_offset=fragment_offset,
+            fragment_offset=fragment_offset,
             ttl=ttl,
             protocol=protocol,
             checksum=checksum,
@@ -51,6 +53,7 @@ class IPv4Packet:
         )
 
 
+@dataclass
 class IPv6TrafficClass:
     dscp: int  # 6 bits
     ecn: int  # 2 bits
@@ -62,16 +65,17 @@ class IPv6TrafficClass:
         return cls(dscp=dscp, ecn=ecn)
 
 
+@dataclass
 class IPv6Packet:
     version: int  # 4 bits
     traffic_class: IPv6TrafficClass  # 8 bits
     flow_label: int  # 20 bits
     length: int  # 16 bits
     next_header: int  # 8 bits
-    hot_limit: int  # 8 bits
+    hop_limit: int  # 8 bits
     src_ip: str  # 128 bits
     dst_ip: str  # 128 bits
-    payload: bytes | str  # IP 包的内容载荷
+    payload: bytes  # IP 包的内容载荷
 
     @classmethod
     def parse(cls, raw_data: bytes) -> 'IPv6Packet':
