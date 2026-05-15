@@ -80,7 +80,7 @@ class EthernetFrame:  # 以太网数据帧
     dst_mac: str  # 6 bytes
     src_mac: str  # 6 bytes
     ethertype: EtherType  # 2 bytes
-    payload: bytes | str
+    payload: bytes
 
     @staticmethod
     def macaddr(raw: bytes) -> str:
@@ -90,13 +90,13 @@ class EthernetFrame:  # 以太网数据帧
     def parse(cls, raw_data: bytes) -> 'EthernetFrame':
         if platform.system() == 'Linux':
             dst_mac, src_mac, ethertype = struct.unpack('!6s6sH', raw_data[:14])
-            payload = raw_data[14:].hex()
+            payload = raw_data[14:]
         else:
             # Windows 和 MacOS 没有这部分的头，只有 payload
             dst_mac = b'\x00\x00\x00\x00\x00\x00'  # 00:00:00:00:00:00
             src_mac = b'\x00\x00\x00\x00\x00\x00'  # 00:00:00:00:00:00
             ethertype = 0xFFFF  # Unknown   # 不知道，没法知道
-            payload = raw_data.hex()
+            payload = raw_data
         return cls(
             dst_mac=cls.macaddr(dst_mac),
             src_mac=cls.macaddr(src_mac),
