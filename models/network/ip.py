@@ -36,7 +36,7 @@ class IPv4Packet:
         version, head_length = ver_head >> 4, ver_head & 0x0F
         flags, fragment_offset = flag_and_offset >> 13, flag_and_offset & 0x1FFF
         payload = raw_data[head_length * 4 :]
-        return cls(
+        return IPv4Packet(
             version=version,
             head_length=head_length,
             service=service,
@@ -86,7 +86,7 @@ class IPv6Packet:
         traffic_class = IPv6TrafficClass.parse(ver_tc_fl >> 20 & 0xFF)
         flow_label = ver_tc_fl & 0xFFFFF
         payload = raw_data[40:]
-        return cls(
+        return IPv6Packet(
             version=version,
             traffic_class=traffic_class,
             flow_label=flow_label,
