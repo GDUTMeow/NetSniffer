@@ -53,7 +53,7 @@ class NDPOption:
     def parse(cls, raw: bytes) -> "NDPOption":
         ndp_type, length = struct.unpack("!BB", raw[:2])
         if ndp_type in (1, 2):  # Source/Target Link-Layer Address
-            link_layer_addr = socket.inet_ntoa(raw[2:8])
+            link_layer_addr = socket.inet_ntop(socket.AF_INET6, raw[2:8])  # 6 bytes MAC address
         else:
             link_layer_addr = None
         return cls(
@@ -162,7 +162,7 @@ class ICMPv6Packet(IPv6Packet):
             identifier = None
             sequence_number = None
             (icmp_reversed,) = struct.unpack("!I", bytes(packet.payload[4:8]))
-            icmpdata = ICMPData.parse(packet.payload[4:], is_ndp=True)
+            icmpdata = ICMPData.parse(packet.payload[8:], is_ndp=True)
         return cls(
             version=packet.version,
             traffic_class=packet.traffic_class,
