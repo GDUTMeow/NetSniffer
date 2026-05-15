@@ -5,6 +5,7 @@ from parser import Parser
 logger = get_logger(__name__)
 parser = Parser()
 
+
 @logger.catch
 def main():
     listener = Listener('en0')

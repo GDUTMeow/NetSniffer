@@ -4,6 +4,7 @@ import struct
 from dataclasses import dataclass
 from enum import Enum
 
+
 class EtherType(Enum):
     # Ref: https://support.huawei.com/enterprise/zh/doc/EDOC1100174722/ea0a043c
     # https://www.iana.org/assignments/ieee-802-numbers/ieee-802-numbers.xhtml#ieee-802-numbers-1
@@ -60,7 +61,7 @@ class EtherType(Enum):
     MAC_SEC = 0x88E5  # Media Access Control Security (IEEE 802.1AE)
     MVRP = 0x88F5  # Multiple VLAN Registration Protocol (IEEE 802.1Q)
     MMRP = 0x88F6  # Multiple Multicast Registration Protocol (IEEE 802.1Q)
-    
+
     # Unknown
     UNKNOWN = 0xFFFF
 
@@ -69,36 +70,38 @@ class EtherType(Enum):
         try:
             return cls(value).name
         except ValueError:
-            return f"Unknown (0x{value:04X})"
+            return f'Unknown (0x{value:04X})'
 
 
 @dataclass
 class EthernetFrame:  # 以太网数据帧
     # Linux only，Windows 和 MacOS 会自己把以太网头给扔掉，导致这里没办法获取到
     # 没办法在课设的情况下去调用 BPF 和 Npcap，所以没办法在这个地方给这两个系统提供这种能力，以后再说吧，想搞了再搞
-    dst_mac: str    # 6 bytes
-    src_mac: str    # 6 bytes
-    ethertype: EtherType    # 2 bytes
+    dst_mac: str  # 6 bytes
+    src_mac: str  # 6 bytes
+    ethertype: EtherType  # 2 bytes
     payload: bytes | str
 
     @staticmethod
     def macaddr(raw: bytes) -> str:
-        return ":".join(f"{b:02x}" for b in raw)
-    
+        return ':'.join(f'{b:02x}' for b in raw)
+
     @classmethod
-    def parse(cls, raw_data: bytes) -> "EthernetFrame":
-        if platform.system() == "Linux":
-            dst_mac, src_mac, ethertype = struct.unpack("!6s6sH", raw_data[:14])
+    def parse(cls, raw_data: bytes) -> 'EthernetFrame':
+        if platform.system() == 'Linux':
+            dst_mac, src_mac, ethertype = struct.unpack('!6s6sH', raw_data[:14])
             payload = raw_data[14:].hex()
         else:
             # Windows 和 MacOS 没有这部分的头，只有 payload
-            dst_mac = b'\x00\x00\x00\x00\x00\x00'   # 00:00:00:00:00:00
-            src_mac = b'\x00\x00\x00\x00\x00\x00'   # 00:00:00:00:00:00
+            dst_mac = b'\x00\x00\x00\x00\x00\x00'  # 00:00:00:00:00:00
+            src_mac = b'\x00\x00\x00\x00\x00\x00'  # 00:00:00:00:00:00
             ethertype = 0xFFFF  # Unknown   # 不知道，没法知道
             payload = raw_data.hex()
         return cls(
             dst_mac=cls.macaddr(dst_mac),
             src_mac=cls.macaddr(src_mac),
-            ethertype=EtherType(ethertype) if ethertype in EtherType._value2member_map_ else EtherType(0xFFFF),
-            payload=payload
+            ethertype=EtherType(ethertype)
+            if ethertype in EtherType._value2member_map_
+            else EtherType(0xFFFF),
+            payload=payload,
         )
