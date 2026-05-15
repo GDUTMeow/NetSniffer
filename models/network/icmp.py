@@ -33,7 +33,7 @@ class ICMPType(Enum):
         try:
             return cls(value).name
         except ValueError:
-            return f"Unknown (0x{value:02X})"
+            return f'Unknown (0x{value:02X})'
 
 
 @dataclass
@@ -44,7 +44,7 @@ class ICMPv6Flags:
     reversed: int  # 29 bits
 
     @classmethod
-    def parse(cls, raw: int) -> "ICMPv6Flags":
+    def parse(cls, raw: int) -> 'ICMPv6Flags':
         return cls(
             router=(raw >> 31) & 0x1,
             solicited=(raw >> 30) & 0x1,
@@ -60,10 +60,10 @@ class NDPOption:
     link_layer_addr: str | None  # 48 bits，可能没有
 
     @classmethod
-    def parse(cls, raw: bytes) -> "NDPOption":
-        ndp_type, length = struct.unpack("!BB", raw[:2])
+    def parse(cls, raw: bytes) -> 'NDPOption':
+        ndp_type, length = struct.unpack('!BB', raw[:2])
         if ndp_type in (1, 2):  # Source/Target Link-Layer Address
-            link_layer_addr = ":".join(f"{b:02x}" for b in raw[2:8])  # 6 bytes
+            link_layer_addr = ':'.join(f'{b:02x}' for b in raw[2:8])  # 6 bytes
         else:
             link_layer_addr = None
         return cls(
@@ -81,7 +81,7 @@ class ICMPData:
     data: bytes  # ICMP payload data
 
     @classmethod
-    def parse(cls, raw: bytes, is_ndp: bool = False) -> "ICMPData":
+    def parse(cls, raw: bytes, is_ndp: bool = False) -> 'ICMPData':
         if not is_ndp:
             # 正常 ping，直接解析一下
             if len(raw) == 32:
@@ -89,7 +89,7 @@ class ICMPData:
                 ts = None
                 data = raw
             else:
-                (ts,) = struct.unpack("!Q", raw[:8])  # 8 bytes timestamp
+                (ts,) = struct.unpack('!Q', raw[:8])  # 8 bytes timestamp
                 data = raw[8:]  # rest is data
             target_addr = None
             ndp_options = None
@@ -114,10 +114,10 @@ class ICMPv4Packet(IPv4Packet):
     icmp_data: ICMPData  # ICMP payload data
 
     @classmethod
-    def parse(cls, raw_data: bytes) -> "ICMPv4Packet":
+    def parse(cls, raw_data: bytes) -> 'ICMPv4Packet':
         packet = super().parse(raw_data)
         type, code, icmp_checksum, identifier, sequence_number = struct.unpack(
-            "!BBHHH", bytes(packet.payload[:8])
+            '!BBHHH', bytes(packet.payload[:8])
         )
         icmpdata = ICMPData.parse(packet.payload[8:])
         return cls(
@@ -154,24 +154,22 @@ class ICMPv6Packet(IPv6Packet):
     icmp_data: ICMPData  # ICMP payload data
 
     @classmethod
-    def parse(cls, raw_data: bytes) -> "ICMPv6Packet":
+    def parse(cls, raw_data: bytes) -> 'ICMPv6Packet':
         packet = super().parse(raw_data)
-        type, code, checksum = struct.unpack("!BBH", bytes(packet.payload[:4]))
+        type, code, checksum = struct.unpack('!BBH', bytes(packet.payload[:4]))
         if type in (
-            ICMPType.IPv4_REQUEST,
-            ICMPType.IPv4_REPLY,
             ICMPType.IPv6_REQUEST,
             ICMPType.IPv6_RESPONSE,
         ):
             identifier, sequence_number = struct.unpack(
-                "!HH", bytes(packet.payload[4:8])
+                '!HH', bytes(packet.payload[4:8])
             )
             icmpdata = ICMPData.parse(packet.payload[8:])
             icmp_reversed = None
         else:
             identifier = None
             sequence_number = None
-            (icmp_reversed,) = struct.unpack("!I", bytes(packet.payload[4:8]))
+            (icmp_reversed,) = struct.unpack('!I', bytes(packet.payload[4:8]))
             icmpdata = ICMPData.parse(packet.payload[8:], is_ndp=True)
         return cls(
             version=packet.version,

@@ -27,6 +27,7 @@ class SetupRequiredError(NetSnifferException):
     ):
         super().__init__(message)
 
+
 class PacketLengthNotSatisfiedError(NetSnifferException):
     """Raised when a packet is too short to be parsed."""
 
