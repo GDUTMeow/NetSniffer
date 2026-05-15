@@ -2,7 +2,7 @@ import sys
 from datetime import datetime
 from typing import Any
 from pathlib import Path
-from loguru import logger, Logger
+from loguru import logger
 
 _initialized = False
 
@@ -57,6 +57,6 @@ def _setup_global_logger():
     _initialized = True
 
 
-def get_logger(name: str) -> Logger:
+def get_logger(name: str):
     _setup_global_logger()
     return logger.bind(name=name)

@@ -2,7 +2,6 @@ import socket
 import platform
 import network
 import selectors
-import struct
 from typing import Callable
 
 from exception import SetupRequiredError, NotFoundError
@@ -137,3 +136,7 @@ class Listener:
                 protocol = key.data
                 packet, addr = sock.recvfrom(65535)
                 handler(packet, protocol)
+
+    def print_raw(self, packet: bytes, protocol: str):
+        logger.info(f"Received {len(packet)} bytes on protocol {protocol}, ")
+        print(packet.hex())
