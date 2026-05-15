@@ -1,5 +1,5 @@
 import struct
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Tuple
 
@@ -55,11 +55,11 @@ class DNSQueryType(Enum):
     TXT = 16
     URI = 256
     ZONEMD = 63
-    
+
     UNKNOWN = 0
-    
+
     @classmethod
-    def parse(cls, value: int) -> "DNSQueryType":
+    def parse(cls, value: int) -> 'DNSQueryType':
         try:
             return cls(value)
         except ValueError:
@@ -81,10 +81,10 @@ class DNSFlags:
     rcode: int  # 4 bits
 
     @classmethod
-    def parse(cls, raw: bytes) -> "DNSFlags":
+    def parse(cls, raw: bytes) -> 'DNSFlags':
         if len(raw) != 2:
-            raise ValueError("DNS flags must be 2 bytes long.")
-        flags_int = struct.unpack("!H", raw)[0]
+            raise PacketLengthNotSatisfiedError('DNS flags must be 2 bytes long.')
+        flags_int = struct.unpack('!H', raw)[0]
         return cls(
             QR=(flags_int >> 15) & 0x1,
             opcode=(flags_int >> 11) & 0xF,
@@ -104,7 +104,8 @@ class DNSQuestion:
     target_name: str
     qtype: DNSQueryType
     qclass: int
-    
+
+
 @dataclass
 class DNSRecord:
     name: str
@@ -112,8 +113,6 @@ class DNSRecord:
     rclass: int
     ttl: int
     rdata: bytes
-    
-
 
 
 @dataclass
@@ -128,44 +127,165 @@ class DNSPacket:
 
     questions: List[DNSQuestion]
     answers: List[DNSRecord]
+    authorities: List[DNSRecord] = field(default_factory=list)
+    additionals: List[DNSRecord] = field(default_factory=list)
 
     @classmethod
-    def parse(cls, raw: bytes) -> "DNSPacket":
+    def parse(cls, raw: bytes) -> 'DNSPacket':
         if len(raw) < 12:
             raise PacketLengthNotSatisfiedError(
-                f"DNS packet must be at least 12 bytes long, got {len(raw)} bytes."
+                f'DNS packet must be at least 12 bytes long, got {len(raw)} bytes.'
             )
-        transaction_id, flag_raw, questions, answers, authority_rrs, additional_rrs = (
-            struct.unpack("!HHHHHH", raw[:12])
-        )
-        flags = DNSFlags.parse(flag_raw)
+        (
+            transaction_id,
+            flag_raw,
+            questions_count,
+            answers_count,
+            authority_rrs_count,
+            additional_rrs_count,
+        ) = struct.unpack('!HHHHHH', raw[:12])
+        flags = DNSFlags.parse(flag_raw.to_bytes(2, 'big'))
+
         idx = 12
-        
-    def _get_name(self, raw: bytes, idx: int) -> Tuple[bytes, int]:
-        name_parts = []
-        cursor = idx
-        processed_idx = -1
-        jumped = False
-        while True:
-            if cursor >= len(raw):
-                raise CursorOutOfBoundsError(
-                    f"Cursor went out of bounds while parsing DNS name at index {cursor}."
+        # Parse query section
+        questions: List[DNSQuestion] = []
+        for _ in range(questions_count):
+            qname, idx = cls._get_name(raw, idx)
+            if idx + 4 > len(raw):
+                raise PacketLengthNotSatisfiedError(
+                    'Not enough bytes for question section'
                 )
-            length = raw[cursor]
+            qtype, qclass = struct.unpack('!HH', raw[idx : idx + 4])
+            idx += 4
+            questions.append(
+                DNSQuestion(
+                    target_name=qname, qtype=DNSQueryType.parse(qtype), qclass=qclass
+                )
+            )
+
+        # Parse response sections
+        answers: List[DNSRecord] = []
+        for _ in range(answers_count):
+            name, idx = cls._get_name(raw, idx)
+            if idx + 10 > len(raw):
+                raise PacketLengthNotSatisfiedError(
+                    'Not enough bytes for answer section'
+                )
+            rtype, rclass, ttl, rdlength = struct.unpack('!HHIH', raw[idx : idx + 10])
+            idx += 10
+            if idx + rdlength > len(raw):
+                raise PacketLengthNotSatisfiedError('Not enough bytes for rdata')
+            rdata = raw[idx : idx + rdlength]
+            idx += rdlength
+            answers.append(
+                DNSRecord(
+                    name=name,
+                    rtype=DNSQueryType.parse(rtype),
+                    rclass=rclass,
+                    ttl=ttl,
+                    rdata=rdata,
+                )
+            )
+
+        # Parse authority sections
+        authorities: List[DNSRecord] = []
+        for _ in range(authority_rrs_count):
+            name, idx = cls._get_name(raw, idx)
+            if idx + 10 > len(raw):
+                raise PacketLengthNotSatisfiedError(
+                    'Not enough bytes for authority section'
+                )
+            rtype, rclass, ttl, rdlength = struct.unpack('!HHIH', raw[idx : idx + 10])
+            idx += 10
+            if idx + rdlength > len(raw):
+                raise PacketLengthNotSatisfiedError('Not enough bytes for rdata')
+            rdata = raw[idx : idx + rdlength]
+            idx += rdlength
+            authorities.append(
+                DNSRecord(
+                    name=name,
+                    rtype=DNSQueryType.parse(rtype),
+                    rclass=rclass,
+                    ttl=ttl,
+                    rdata=rdata,
+                )
+            )
+
+        # Parse additional sections
+        additionals: List[DNSRecord] = []
+        for _ in range(additional_rrs_count):
+            name, idx = cls._get_name(raw, idx)
+            if idx + 10 > len(raw):
+                raise PacketLengthNotSatisfiedError(
+                    'Not enough bytes for additional section'
+                )
+            rtype, rclass, ttl, rdlength = struct.unpack('!HHIH', raw[idx : idx + 10])
+            idx += 10
+            if idx + rdlength > len(raw):
+                raise PacketLengthNotSatisfiedError('Not enough bytes for rdata')
+            rdata = raw[idx : idx + rdlength]
+            idx += rdlength
+            additionals.append(
+                DNSRecord(
+                    name=name,
+                    rtype=DNSQueryType.parse(rtype),
+                    rclass=rclass,
+                    ttl=ttl,
+                    rdata=rdata,
+                )
+            )
+
+        return cls(
+            transaction_id=transaction_id,
+            flags=flags,
+            questions_count=questions_count,
+            answers_count=answers_count,
+            authority_rrs_count=authority_rrs_count,
+            additional_rrs_count=additional_rrs_count,
+            questions=questions,
+            answers=answers,
+            authorities=authorities,
+            additionals=additionals,
+        )
+
+    @classmethod
+    def _get_name(cls, raw: bytes, offset: int) -> Tuple[str, int]:
+        parts: List[str] = []
+        current: int = offset
+        jumped: bool = False
+        jump_target: int = -1
+
+        while True:
+            if current >= len(raw):
+                raise CursorOutOfBoundsError(f'Cursor out of bounds at {current}')
+
+            length = raw[current]
+            # compressed
             if length & 0xC0 == 0xC0:
+                if current + 1 >= len(raw):
+                    raise CursorOutOfBoundsError('Truncated pointer in DNS name')
+                # record the position after jump for later use
                 if not jumped:
-                    nonlocal processed_idx
-                    processed_idx = cursor + 2
-                pointer = struct.unpack("!H", raw[cursor:cursor+2])[0]
-                cursor = pointer & 0x3FFF
+                    jump_target = current + 2
+                # calculate the pointer target
+                pointer = struct.unpack('!H', raw[current : current + 2])[0] & 0x3FFF
+                current = pointer
                 jumped = True
                 continue
-            cursor += 1
+
+            # normal label
+            current += 1
             if length == 0:
                 break
-            
-            name_parts.append(raw[cursor:cursor+length].decode("ascii", errors="replace"))
-            cursor += length
-        next_idx = processed_idx if jumped else cursor
-        return ".".join(name_parts).encode("ascii"), next_idx
-            
+
+            if current + length > len(raw):
+                raise CursorOutOfBoundsError('DNS label exceeds packet boundary')
+            label: str = raw[current : current + length].decode(
+                'ascii', errors='replace'
+            )
+            parts.append(label)
+            current += length
+
+        # Jumped, so need to return
+        next_idx = jump_target if jumped else current
+        return '.'.join(parts), next_idx
