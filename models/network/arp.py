@@ -13,7 +13,7 @@ class ARPType(Enum):
     UNKNOWN = 255
 
     @classmethod
-    def query(cls, value: int):
+    def query(cls, value: int) -> str:
         try:
             return cls(value).name
         except ValueError:
@@ -54,7 +54,7 @@ class ARPPacket:
             protocol_type=protocol_type,
             hardware_size=hardware_size,
             protocol_size=protocol_size,
-            opcode=ARPType.query(opcode),
+            opcode=ARPType(opcode),
             src_mac=":".join(f"{b:02x}" for b in src_mac),
             src_ip=socket.inet_ntoa(src_ip),
             dst_mac=":".join(f"{b:02x}" for b in dst_mac),
