@@ -33,3 +33,10 @@ class PacketLengthNotSatisfiedError(NetSnifferException):
 
     def __init__(self, message: str = 'Packet length is not sufficient for parsing.'):
         super().__init__(message)
+
+
+class MalformedTCPOptionError(NetSnifferException):
+    """Raised when a TCP option is malformed."""
+
+    def __init__(self, message: str = 'Malformed TCP option encountered.'):
+        super().__init__(message)
