@@ -132,6 +132,7 @@ class DNSPacket:
 
     @classmethod
     def parse(cls, raw: bytes) -> 'DNSPacket':
+        # Ref: https://github.com/hibikiF/rfc1035/blob/master/src/rfc1035.c
         if len(raw) < 12:
             raise PacketLengthNotSatisfiedError(
                 f'DNS packet must be at least 12 bytes long, got {len(raw)} bytes.'
