@@ -25,6 +25,13 @@ class ICMPType(Enum):
     NEIGHBOR_ADVERTISEMENT = 136
     MULTICAST_LISTENER_REPORT = 143
 
+    # UNKNOWN
+    UNKNOWN = 255
+
+    @classmethod
+    def query(cls, value: int):
+        return cls(value).name if value in cls._value2member_map_ else cls.UNKNOWN
+
 
 @dataclass
 class ICMPv6Flags:
@@ -53,7 +60,7 @@ class NDPOption:
     def parse(cls, raw: bytes) -> "NDPOption":
         ndp_type, length = struct.unpack("!BB", raw[:2])
         if ndp_type in (1, 2):  # Source/Target Link-Layer Address
-            link_layer_addr = socket.inet_ntop(socket.AF_INET6, raw[2:8])  # 6 bytes MAC address
+            link_layer_addr = ":".join(f"{b:02x}" for b in raw[2:8])  # 6 bytes
         else:
             link_layer_addr = None
         return cls(
@@ -89,8 +96,8 @@ class ICMPData:
             target_addr = socket.inet_ntop(
                 socket.AF_INET6, raw[:16]
             )  # 16 bytes IPv6 address
-            ndp_options = NDPOption.parse(raw[16:80])  # rest is NDP options
-            data = raw[80:]  # rest is data
+            ndp_options = NDPOption.parse(raw[16:])  # rest is NDP options
+            data = raw[16:]
         return cls(ts=ts, data=data, target_addr=target_addr, ndp_options=ndp_options)
 
 
@@ -147,7 +154,7 @@ class ICMPv6Packet(IPv6Packet):
     def parse(cls, raw_data: bytes) -> "ICMPv6Packet":
         packet = super().parse(raw_data)
         type, code, checksum = struct.unpack("!BBH", bytes(packet.payload[:4]))
-        if type not in (
+        if type in (
             ICMPType.IPv4_REQUEST,
             ICMPType.IPv4_REPLY,
             ICMPType.IPv6_REQUEST,
