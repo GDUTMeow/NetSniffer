@@ -26,3 +26,9 @@ class SetupRequiredError(NetSnifferException):
         self, message: str = 'Setup is required before this operation can be performed.'
     ):
         super().__init__(message)
+
+class PacketLengthNotSatisfiedError(NetSnifferException):
+    """Raised when a packet is too short to be parsed."""
+
+    def __init__(self, message: str = 'Packet length is not sufficient for parsing.'):
+        super().__init__(message)

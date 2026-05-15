@@ -30,7 +30,10 @@ class ICMPType(Enum):
 
     @classmethod
     def query(cls, value: int):
-        return cls(value).name if value in cls._value2member_map_ else cls.UNKNOWN
+        try:
+            return cls(value).name
+        except ValueError:
+            return f"Unknown (0x{value:02X})"
 
 
 @dataclass
