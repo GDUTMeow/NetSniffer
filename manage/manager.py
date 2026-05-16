@@ -5,6 +5,7 @@ import zlib
 import time
 from typing import Any, Dict, List
 from collections import deque
+from pathlib import Path
 
 from logger import get_logger
 
@@ -15,7 +16,7 @@ class PacketManager:
     def __init__(
         self, filename: str, directory: str = 'captures', max_packets: int = 100
     ):
-        self._ensure_file_directory()
+        self._ensure_file_directory(directory)
         self.filename = filename
         self.directory = directory
         self.max_packets = max_packets
@@ -26,9 +27,9 @@ class PacketManager:
         )
         self.packet_count = 0  # 记录所有包的数量
 
-    def _ensure_file_directory(self):
-        if not os.path.exists(self.directory):
-            os.makedirs(self.directory)
+    def _ensure_file_directory(self, directory: Path):
+        if not os.path.exists(directory):
+            os.makedirs(directory)
 
     def load_range(self, start_idx: int, count: int = 50) -> List[Dict[str, Any]]:
         results: List[Dict[str, Any]] = []

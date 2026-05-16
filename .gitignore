@@ -19,6 +19,7 @@ wheels/
 # Tests
 test*
 *.sh
+captures/
 
 # Logs
 logs/
