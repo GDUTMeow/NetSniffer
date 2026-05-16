@@ -31,9 +31,11 @@ class Parser:
 
     def parse(self, raw_data: bytes) -> ParsedResult:
         ethernet_frame = self.parse_ethernet(raw_data)
+        logger.debug(f'Parsed Ethernet frame: src={ethernet_frame.src_mac}, dst={ethernet_frame.dst_mac}, ethertype={ethernet_frame.ethertype}')
         network_packet = self.parse_network(
             ethernet_frame.payload, ethernet_frame.ethertype
         )
+        logger.debug(f'Parsed Network packet: {type(network_packet).__name__ if network_packet else "None"}')
 
         transport_packet = None
         application_packet = None
@@ -41,8 +43,10 @@ class Parser:
 
         if isinstance(network_packet, ARPPacket):
             label = 'ARP'
+            logger.debug('Parsed ARP packet, skipping transport and application parsing.')
         elif isinstance(network_packet, (ICMPv4Packet, ICMPv6Packet)):
             label = 'ICMPv4' if isinstance(network_packet, ICMPv4Packet) else 'ICMPv6'
+            logger.debug(f'Parsed {label} packet, skipping transport and application parsing.')
         elif isinstance(network_packet, (IPv4Packet, IPv6Packet)):
             proto_num = (
                 network_packet.protocol
@@ -52,6 +56,7 @@ class Parser:
             transport_packet = self.parse_transport(network_packet.payload, proto_num)
             if transport_packet:
                 label = 'TCP' if isinstance(transport_packet, TCPPacket) else 'UDP'
+                logger.debug(f'Parsed {label} packet, checking for application layer parsing.')
                 service = SERVICES_PORT_MAPPING.get(
                     transport_packet.src_port
                 ) or SERVICES_PORT_MAPPING.get(transport_packet.dst_port)
@@ -60,10 +65,19 @@ class Parser:
                 )
                 if application_packet:
                     label = service
+                    logger.debug(f'Parsed application layer protocol: {service}')
+                    logger.debug(f'Application packet details: {application_packet}')
+                else:
+                    logger.debug('No application layer protocol identified.')
+                    logger.debug(f'Transport packet details: {transport_packet}')
             else:
                 label = 'IPv4' if isinstance(network_packet, IPv4Packet) else 'IPv6'
+                logger.debug(f'No transport layer protocol identified, labeling as {label}.')
+                logger.debug(f'Network packet details: {network_packet}')
         else:
             label = ethernet_frame.ethertype.name
+            logger.debug(f'Unknown network layer protocol, labeling as {label}.')
+            logger.debug(f'Ethernet frame details: {ethernet_frame}')
 
         parsed_dict: Dict[str, Any] = {
             'raw': raw_data,
@@ -72,6 +86,7 @@ class Parser:
             'transport': transport_packet,
             'application': application_packet,
         }
+        logger.debug(f'Adding packet to manager: {label if label is not None else "Unknown"}')
         packet_manager.add_packet(parsed_dict, label=label if label is not None else 'Unknown')
         return ParsedResult(**parsed_dict)
 
