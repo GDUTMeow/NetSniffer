@@ -17,6 +17,7 @@ logger = get_logger(__name__)
 
 
 class ParsedResult(TypedDict):
+    raw: bytes
     ethernet: EthernetFrame
     network: Optional[IPv4Packet | IPv6Packet | ICMPv4Packet | ICMPv6Packet | ARPPacket]
     transport: Optional[TCPPacket | UDPPacket]
@@ -53,6 +54,7 @@ class Parser:
                     'Transport packet is None, cannot parse application layer'
                 )
                 return ParsedResult(
+                    raw=raw_data,
                     ethernet=ethernet_frame,
                     network=network_packet,
                     transport=None,
@@ -66,6 +68,7 @@ class Parser:
             )
             logger.debug(f'Parsed Application Packet: {application_packet}')
             return ParsedResult(
+                raw=raw_data,
                 ethernet=ethernet_frame,
                 network=network_packet,
                 transport=transport_packet,
@@ -73,6 +76,7 @@ class Parser:
             )
         else:
             return ParsedResult(
+                raw=raw_data,
                 ethernet=ethernet_frame,
                 network=network_packet,
                 transport=None,
