@@ -33,7 +33,7 @@ class Parser:
         logger.debug(f'Parsed Ethernet Frame: {ethernet_frame}')
         # Parse network layer
         network_packet = self.parse_network(
-            ethernet_frame.payload, ethernet_frame.ethertype.value
+            ethernet_frame.payload, ethernet_frame.ethertype
         )
         logger.debug(f'Parsed Network Packet: {network_packet}')
         # Parse transport layer
@@ -85,7 +85,7 @@ class Parser:
     def parse_network(
         self,
         raw_data: bytes,
-        protocol: int,
+        protocol: EtherType,
     ) -> ICMPv4Packet | IPv4Packet | ICMPv6Packet | IPv6Packet | ARPPacket | None:
         if protocol == EtherType.IPV4:
             packet = IPv4Packet.parse(raw_data)
