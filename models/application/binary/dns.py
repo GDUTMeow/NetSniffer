@@ -182,7 +182,7 @@ class DNSPacket:
             qname, idx = cls._get_name(raw, idx)
             qtype, qclass = struct.unpack('!HH', raw[idx : idx + 4])
             idx += 4
-            questions.append(DNSQuestion(qname, DNSQueryType.parse(qtype), qclass)) # type: ignore
+            questions.append(DNSQuestion(qname, DNSQueryType.parse(qtype), qclass))  # type: ignore
 
         answers, idx = parse_rr(idx, a_count)
         authorities, idx = parse_rr(idx, auth_count)
