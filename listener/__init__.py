@@ -139,9 +139,10 @@ class Listener:
             events = selector.select(timeout=1)
             for key, mask in events:
                 sock = key.fileobj
-                protocol = key.data
+                protocol = key.data  # ipv4/ipv6
                 packet, addr = sock.recvfrom(65535)
-                print(handler(packet))
+                logger.debug(f'Received packet from {addr} on protocol {protocol}')
+                handler(packet)
 
     def print_raw(self, packet: bytes, protocol: str):
         logger.info(f'Received {len(packet)} bytes on protocol {protocol}, ')

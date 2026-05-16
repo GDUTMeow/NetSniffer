@@ -1,4 +1,4 @@
-from typing import TypedDict, Optional
+from typing import TypedDict, Optional, Dict, Any
 
 from models.datalink import EthernetFrame, EtherType
 from models.network import IPv4Packet, IPv6Packet, ICMPv4Packet, ICMPv6Packet, ARPPacket
@@ -12,6 +12,7 @@ from models.application import (
     SERVICES_PORT_MAPPING,
 )
 from logger import get_logger
+from manage import packet_manager
 
 logger = get_logger(__name__)
 
@@ -29,59 +30,50 @@ class Parser:
         pass
 
     def parse(self, raw_data: bytes) -> ParsedResult:
-        # Parse ethernet frame
         ethernet_frame = self.parse_ethernet(raw_data)
-        logger.debug(f'Parsed Ethernet Frame: {ethernet_frame}')
-        # Parse network layer
         network_packet = self.parse_network(
             ethernet_frame.payload, ethernet_frame.ethertype
         )
-        logger.debug(f'Parsed Network Packet: {network_packet}')
-        # Parse transport layer
-        if isinstance(network_packet, (IPv4Packet, IPv6Packet)):
-            transport_packet = self.parse_transport(
-                network_packet.payload,
-                (
-                    network_packet.protocol
-                    if isinstance(network_packet, IPv4Packet)
-                    else network_packet.next_header
-                ),
+
+        transport_packet = None
+        application_packet = None
+        label = 'Unknown'
+
+        if isinstance(network_packet, ARPPacket):
+            label = 'ARP'
+        elif isinstance(network_packet, (ICMPv4Packet, ICMPv6Packet)):
+            label = 'ICMPv4' if isinstance(network_packet, ICMPv4Packet) else 'ICMPv6'
+        elif isinstance(network_packet, (IPv4Packet, IPv6Packet)):
+            proto_num = (
+                network_packet.protocol
+                if isinstance(network_packet, IPv4Packet)
+                else network_packet.next_header
             )
-            logger.debug(f'Parsed Transport Packet: {transport_packet}')
-            # Parse application layer
-            if transport_packet is None:
-                logger.warning(
-                    'Transport packet is None, cannot parse application layer'
+            transport_packet = self.parse_transport(network_packet.payload, proto_num)
+            if transport_packet:
+                label = 'TCP' if isinstance(transport_packet, TCPPacket) else 'UDP'
+                service = SERVICES_PORT_MAPPING.get(
+                    transport_packet.src_port
+                ) or SERVICES_PORT_MAPPING.get(transport_packet.dst_port)
+                application_packet = self.parse_application(
+                    transport_packet.payload, service
                 )
-                return ParsedResult(
-                    raw=raw_data,
-                    ethernet=ethernet_frame,
-                    network=network_packet,
-                    transport=None,
-                    application=None,
-                )
-            service = SERVICES_PORT_MAPPING.get(
-                transport_packet.src_port
-            ) or SERVICES_PORT_MAPPING.get(transport_packet.dst_port)
-            application_packet = self.parse_application(
-                transport_packet.payload, service
-            )
-            logger.debug(f'Parsed Application Packet: {application_packet}')
-            return ParsedResult(
-                raw=raw_data,
-                ethernet=ethernet_frame,
-                network=network_packet,
-                transport=transport_packet,
-                application=application_packet,
-            )
+                if application_packet:
+                    label = service
+            else:
+                label = 'IPv4' if isinstance(network_packet, IPv4Packet) else 'IPv6'
         else:
-            return ParsedResult(
-                raw=raw_data,
-                ethernet=ethernet_frame,
-                network=network_packet,
-                transport=None,
-                application=None,
-            )
+            label = ethernet_frame.ethertype.name
+
+        parsed_dict: Dict[str, Any] = {
+            'raw': raw_data,
+            'ethernet': ethernet_frame,
+            'network': network_packet,
+            'transport': transport_packet,
+            'application': application_packet,
+        }
+        packet_manager.add_packet(parsed_dict, label=label if label is not None else 'Unknown')
+        return ParsedResult(**parsed_dict)
 
     def parse_ethernet(self, raw_data: bytes) -> EthernetFrame:
         return EthernetFrame.parse(raw_data)
