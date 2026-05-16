@@ -9,19 +9,19 @@ from exception import PacketLengthNotSatisfiedError
 class NTPFlags:
     leap_indicator: int  # 2 bits
     version_number: int  # 3 bits
-    mode: Literal["server", "client", "unknown"]  # 3 bits
+    mode: Literal['server', 'client', 'unknown']  # 3 bits
 
     @classmethod
-    def parse(cls, flags: int) -> "NTPFlags":
+    def parse(cls, flags: int) -> 'NTPFlags':
         leap_indicator = (flags >> 6) & 0b11
         version_number = (flags >> 3) & 0b111
         mode = flags & 0b111
         if mode == 4:
-            mode_str = "server"
+            mode_str = 'server'
         elif mode == 3:
-            mode_str = "client"
+            mode_str = 'client'
         else:
-            mode_str = "unknown"
+            mode_str = 'unknown'
         return cls(
             leap_indicator=leap_indicator,
             version_number=version_number,
@@ -44,10 +44,10 @@ class NTPPacket:
     transmit_ts: float  # 64 bits, Transmit Timestamp
 
     @classmethod
-    def parse(cls, raw: bytes) -> "NTPPacket":
+    def parse(cls, raw: bytes) -> 'NTPPacket':
         if len(raw) != 48:
             raise PacketLengthNotSatisfiedError(
-                f"NTP packet must be 48 bytes, got {len(raw)} bytes"
+                f'NTP packet must be 48 bytes, got {len(raw)} bytes'
             )
         (
             flags,
@@ -61,11 +61,11 @@ class NTPPacket:
             orig_ts,
             recv_ts,
             transmit_ts,
-        ) = struct.unpack("!BBBBII4sQQQQ", raw)
+        ) = struct.unpack('!BBBBII4sQQQQ', raw)
         # Trying to convert ref_id to ip addr
         try:
-            addr_tmp = struct.unpack("!BBBB", ref_id)
-            ref_id = ".".join(map(str, addr_tmp))
+            addr_tmp = struct.unpack('!BBBB', ref_id)
+            ref_id = '.'.join(map(str, addr_tmp))
         except Exception:
             pass
         return cls(
@@ -94,18 +94,18 @@ class NTPPacket:
         return seconds - 2208988800 + fraction
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     PACKETS = [
-        "23000000000000000000000000000000000000000000000000000000000000000000000000000000edb2cdfe3d6af038",
-        "240100e7000000010000000142445300edb2cdfcd3381c3fedb2cdfe3d6af038edb2cdfe57284481edb2cdfe572a7098",
-        "23000000000000000000000000000000000000000000000000000000000000000000000000000000edb2cdfe4bf4dbdf",
-        "240203e90000001800000808647a24c4edb2c9de512b9a42edb2cdfe4bf4dbdfedb2cdfe5f2df0dfedb2cdfe5f2fb0dd",
-        "23000000000000000000000000000000000000000000000000000000000000000000000000000000edb2cdfe501cd5f9",
-        "240300e6000001b2000000247f000001edb2cdd5ee3e1216edb2cdfe501cd5f9edb2cdfe78ab3207edb2cdfe78ac64e0",
-        "23000000000000000000000000000000000000000000000000000000000000000000000000000000edb2cdfe821bd1ed",
-        "240300e6000001b20000002d7f000001edb2cdccf7feda99edb2cdfe821bd1ededb2cdfeaac86ac9edb2cdfeaac8e96e",
-        "23000000000000000000000000000000000000000000000000000000000000000000000000000000edb2cdfeaca52695",
-        "240300e600000905000000300aff0804edb2cdd1bde1b675edb2cdfeaca52695edb2cdfed394ed71edb2cdfed39881ee"
+        '23000000000000000000000000000000000000000000000000000000000000000000000000000000edb2cdfe3d6af038',
+        '240100e7000000010000000142445300edb2cdfcd3381c3fedb2cdfe3d6af038edb2cdfe57284481edb2cdfe572a7098',
+        '23000000000000000000000000000000000000000000000000000000000000000000000000000000edb2cdfe4bf4dbdf',
+        '240203e90000001800000808647a24c4edb2c9de512b9a42edb2cdfe4bf4dbdfedb2cdfe5f2df0dfedb2cdfe5f2fb0dd',
+        '23000000000000000000000000000000000000000000000000000000000000000000000000000000edb2cdfe501cd5f9',
+        '240300e6000001b2000000247f000001edb2cdd5ee3e1216edb2cdfe501cd5f9edb2cdfe78ab3207edb2cdfe78ac64e0',
+        '23000000000000000000000000000000000000000000000000000000000000000000000000000000edb2cdfe821bd1ed',
+        '240300e6000001b20000002d7f000001edb2cdccf7feda99edb2cdfe821bd1ededb2cdfeaac86ac9edb2cdfeaac8e96e',
+        '23000000000000000000000000000000000000000000000000000000000000000000000000000000edb2cdfeaca52695',
+        '240300e600000905000000300aff0804edb2cdd1bde1b675edb2cdfeaca52695edb2cdfed394ed71edb2cdfed39881ee',
     ]
     for packet in PACKETS:
         raw = bytes.fromhex(packet)
