@@ -16,7 +16,7 @@ class PacketManager:
     def __init__(
         self, filename: str, directory: str = 'captures', max_packets: int = 100
     ):
-        self._ensure_file_directory(directory)
+        self._ensure_file_directory(Path(directory))
         self.filename = filename
         self.directory = directory
         self.max_packets = max_packets

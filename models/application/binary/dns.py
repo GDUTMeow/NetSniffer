@@ -128,127 +128,73 @@ class DNSPacket:
 
     questions: List[DNSQuestion]
     answers: List[DNSRecord]
-    authorities: List[DNSRecord] = field(default_factory=list)
-    additionals: List[DNSRecord] = field(default_factory=list)
+    authorities: List[DNSRecord] = field(default_factory=list)  # type: ignore
+    additionals: List[DNSRecord] = field(default_factory=list)  # type: ignore
 
     @classmethod
     def parse(cls, raw: bytes) -> 'DNSPacket':
         # Ref: https://github.com/hibikiF/rfc1035/blob/master/src/rfc1035.c
         if len(raw) < 12:
             raise PacketLengthNotSatisfiedError(
-                f'DNS packet must be at least 12 bytes long, got {len(raw)} bytes.'
+                f'DNS packet too short: {len(raw)} bytes.'
             )
-        (
-            transaction_id,
-            flag_raw,
-            questions_count,
-            answers_count,
-            authority_rrs_count,
-            additional_rrs_count,
-        ) = struct.unpack('!HHHHHH', raw[:12])
+
+        (transaction_id, flag_raw, q_count, a_count, auth_count, add_count) = (
+            struct.unpack('!HHHHHH', raw[:12])
+        )
         flags = DNSFlags.parse(flag_raw.to_bytes(2, 'big'))
 
         idx = 12
-        # Parse query section
+
+        def parse_rr(current_idx: int, count: int) -> Tuple[List[DNSRecord], int]:
+            records: List[DNSRecord] = []
+            ptr = current_idx
+            for _ in range(count):
+                name, ptr = cls._get_name(raw, ptr)
+                if ptr + 10 > len(raw):
+                    break
+
+                rtype, rclass, ttl, rdlen = struct.unpack('!HHIH', raw[ptr : ptr + 10])
+                ptr += 10
+
+                rdata_raw = raw[ptr : ptr + rdlen]
+                rtype_enum = DNSQueryType.parse(rtype)
+
+                if rtype_enum == DNSQueryType.A and rdlen == 4:
+                    parsed_val = socket.inet_ntoa(rdata_raw)
+                elif rtype_enum == DNSQueryType.AAAA and rdlen == 16:
+                    parsed_val = socket.inet_ntop(socket.AF_INET6, rdata_raw)
+                elif rtype_enum in (
+                    DNSQueryType.CNAME,
+                    DNSQueryType.NS,
+                    DNSQueryType.PTR,
+                ):
+                    parsed_val, _ = cls._get_name(raw, ptr)
+                else:
+                    parsed_val = rdata_raw
+
+                records.append(DNSRecord(name, rtype_enum, rclass, ttl, parsed_val))
+                ptr += rdlen
+            return records, ptr
+
         questions: List[DNSQuestion] = []
-        for _ in range(questions_count):
+        for _ in range(q_count):
             qname, idx = cls._get_name(raw, idx)
-            if idx + 4 > len(raw):
-                raise PacketLengthNotSatisfiedError(
-                    'Not enough bytes for question section'
-                )
             qtype, qclass = struct.unpack('!HH', raw[idx : idx + 4])
             idx += 4
-            questions.append(
-                DNSQuestion(
-                    target_name=qname, qtype=DNSQueryType.parse(qtype), qclass=qclass
-                )
-            )
+            questions.append(DNSQuestion(qname, DNSQueryType.parse(qtype), qclass)) # type: ignore
 
-        # Parse response sections
-        answers: List[DNSRecord] = []
-        for _ in range(answers_count):
-            name, idx = cls._get_name(raw, idx)
-            if idx + 10 > len(raw):
-                raise PacketLengthNotSatisfiedError(
-                    'Not enough bytes for answer section'
-                )
-            rtype, rclass, ttl, rdlength = struct.unpack('!HHIH', raw[idx : idx + 10])
-            idx += 10
-            if idx + rdlength > len(raw):
-                raise PacketLengthNotSatisfiedError('Not enough bytes for rdata')
-            rdata = raw[idx : idx + rdlength]
-            rdata_str = (
-                socket.inet_ntoa(rdata)
-                if rtype in (1, 28) and rdlength in (4, 16)
-                else rdata
-            )
-            idx += rdlength
-            answers.append(
-                DNSRecord(
-                    name=name,
-                    rtype=DNSQueryType.parse(rtype),
-                    rclass=rclass,
-                    ttl=ttl,
-                    rdata=rdata_str,
-                )
-            )
-
-        # Parse authority sections
-        authorities: List[DNSRecord] = []
-        for _ in range(authority_rrs_count):
-            name, idx = cls._get_name(raw, idx)
-            if idx + 10 > len(raw):
-                raise PacketLengthNotSatisfiedError(
-                    'Not enough bytes for authority section'
-                )
-            rtype, rclass, ttl, rdlength = struct.unpack('!HHIH', raw[idx : idx + 10])
-            idx += 10
-            if idx + rdlength > len(raw):
-                raise PacketLengthNotSatisfiedError('Not enough bytes for rdata')
-            rdata = raw[idx : idx + rdlength]
-            idx += rdlength
-            authorities.append(
-                DNSRecord(
-                    name=name,
-                    rtype=DNSQueryType.parse(rtype),
-                    rclass=rclass,
-                    ttl=ttl,
-                    rdata=rdata,
-                )
-            )
-
-        # Parse additional sections
-        additionals: List[DNSRecord] = []
-        for _ in range(additional_rrs_count):
-            name, idx = cls._get_name(raw, idx)
-            if idx + 10 > len(raw):
-                raise PacketLengthNotSatisfiedError(
-                    'Not enough bytes for additional section'
-                )
-            rtype, rclass, ttl, rdlength = struct.unpack('!HHIH', raw[idx : idx + 10])
-            idx += 10
-            if idx + rdlength > len(raw):
-                raise PacketLengthNotSatisfiedError('Not enough bytes for rdata')
-            rdata = raw[idx : idx + rdlength]
-            idx += rdlength
-            additionals.append(
-                DNSRecord(
-                    name=name,
-                    rtype=DNSQueryType.parse(rtype),
-                    rclass=rclass,
-                    ttl=ttl,
-                    rdata=rdata,
-                )
-            )
+        answers, idx = parse_rr(idx, a_count)
+        authorities, idx = parse_rr(idx, auth_count)
+        additionals, idx = parse_rr(idx, add_count)
 
         return cls(
             transaction_id=transaction_id,
             flags=flags,
-            questions_count=questions_count,
-            answers_count=answers_count,
-            authority_rrs_count=authority_rrs_count,
-            additional_rrs_count=additional_rrs_count,
+            questions_count=q_count,
+            answers_count=a_count,
+            authority_rrs_count=auth_count,
+            additional_rrs_count=add_count,
             questions=questions,
             answers=answers,
             authorities=authorities,
