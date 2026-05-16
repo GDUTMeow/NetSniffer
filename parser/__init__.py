@@ -1,3 +1,5 @@
+from typing import TypedDict, Optional
+
 from models.datalink import EthernetFrame, EtherType
 from models.network import IPv4Packet, IPv6Packet, ICMPv4Packet, ICMPv6Packet, ARPPacket
 from models.transport import TCPPacket, UDPPacket
@@ -14,35 +16,26 @@ from logger import get_logger
 logger = get_logger(__name__)
 
 
+class ParsedResult(TypedDict):
+    ethernet: EthernetFrame
+    network: Optional[IPv4Packet | IPv6Packet | ICMPv4Packet | ICMPv6Packet | ARPPacket]
+    transport: Optional[TCPPacket | UDPPacket]
+    application: Optional[DNSPacket | HTTPPacket | NTPPacket | RedisPacket | FTPPacket]
+
+
 class Parser:
     def __init__(self):
         pass
 
-    def parse(self, raw_data: bytes) -> dict[
-        str,
-        EthernetFrame
-        | IPv4Packet
-        | IPv6Packet
-        | ICMPv4Packet
-        | ICMPv6Packet
-        | ARPPacket
-        | TCPPacket
-        | UDPPacket
-        | DNSPacket
-        | HTTPPacket
-        | NTPPacket
-        | RedisPacket
-        | FTPPacket
-        | None,
-    ]:
+    def parse(self, raw_data: bytes) -> ParsedResult:
         # Parse ethernet frame
         ethernet_frame = self.parse_ethernet(raw_data)
-        logger.debug(f"Parsed Ethernet Frame: {ethernet_frame}")
+        logger.debug(f'Parsed Ethernet Frame: {ethernet_frame}')
         # Parse network layer
         network_packet = self.parse_network(
             ethernet_frame.payload, ethernet_frame.ethertype.value
         )
-        logger.debug(f"Parsed Network Packet: {network_packet}")
+        logger.debug(f'Parsed Network Packet: {network_packet}')
         # Parse transport layer
         if isinstance(network_packet, (IPv4Packet, IPv6Packet)):
             transport_packet = self.parse_transport(
@@ -53,32 +46,38 @@ class Parser:
                     else network_packet.next_header
                 ),
             )
-            logger.debug(f"Parsed Transport Packet: {transport_packet}")
+            logger.debug(f'Parsed Transport Packet: {transport_packet}')
             # Parse application layer
             if transport_packet is None:
-                logger.warning("Transport packet is None, cannot parse application layer")
-                return {
-                    "ethernet": ethernet_frame,
-                    "network": network_packet,
-                }
+                logger.warning(
+                    'Transport packet is None, cannot parse application layer'
+                )
+                return ParsedResult(
+                    ethernet=ethernet_frame,
+                    network=network_packet,
+                    transport=None,
+                    application=None,
+                )
             service = SERVICES_PORT_MAPPING.get(
                 transport_packet.src_port
             ) or SERVICES_PORT_MAPPING.get(transport_packet.dst_port)
             application_packet = self.parse_application(
                 transport_packet.payload, service
             )
-            logger.debug(f"Parsed Application Packet: {application_packet}")
-            return {
-                "ethernet": ethernet_frame,
-                "network": network_packet,
-                "transport": transport_packet,
-                "application": application_packet,
-            }
+            logger.debug(f'Parsed Application Packet: {application_packet}')
+            return ParsedResult(
+                ethernet=ethernet_frame,
+                network=network_packet,
+                transport=transport_packet,
+                application=application_packet,
+            )
         else:
-            return {
-                "ethernet": ethernet_frame,
-                "network": network_packet,
-            }
+            return ParsedResult(
+                ethernet=ethernet_frame,
+                network=network_packet,
+                transport=None,
+                application=None,
+            )
 
     def parse_ethernet(self, raw_data: bytes) -> EthernetFrame:
         return EthernetFrame.parse(raw_data)
@@ -87,7 +86,7 @@ class Parser:
         self,
         raw_data: bytes,
         protocol: int,
-    ):
+    ) -> ICMPv4Packet | IPv4Packet | ICMPv6Packet | IPv6Packet | ARPPacket | None:
         if protocol == EtherType.IPV4:
             packet = IPv4Packet.parse(raw_data)
             if packet.protocol == 1:  # ICMP
@@ -103,7 +102,9 @@ class Parser:
         elif protocol == EtherType.ARP:
             return ARPPacket.parse(raw_data)
 
-    def parse_transport(self, raw_data: bytes, protocol: int):
+    def parse_transport(
+        self, raw_data: bytes, protocol: int
+    ) -> TCPPacket | UDPPacket | None:
         if protocol == 6:  # TCP
             return TCPPacket.parse(raw_data)
         elif protocol == 17:  # UDP
@@ -114,18 +115,18 @@ class Parser:
         raw_data: bytes,
         service: str | None,
     ):
-        if service == "HTTP":
+        if service == 'HTTP':
             return HTTPPacket.parse(raw_data)
-        elif service == "FTP":
+        elif service == 'FTP':
             return FTPPacket.parse(raw_data)
-        elif service == "DNS":
+        elif service == 'DNS':
             return DNSPacket.parse(raw_data)
-        elif service == "NTP":
+        elif service == 'NTP':
             return NTPPacket.parse(raw_data)
-        elif service == "Redis":
+        elif service == 'Redis':
             return RedisPacket.parse(raw_data)
         else:
             logger.warning(
-                "Unknown application protocol, cannot parse application layer"
+                'Unknown application protocol, cannot parse application layer'
             )
             return None

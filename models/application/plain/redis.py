@@ -27,6 +27,7 @@ class RedisSerializedPacket:
     length: int | None = None
     is_null: bool = False
 
+
 @dataclass
 class RedisPacket:
     content: List[RedisSerializedPacket]

@@ -121,7 +121,7 @@ class Listener:
                             self.sniffer_v6.bind(('::', 0, 0, self.interface_idx))  # type: ignore
         self.is_setup = True
 
-    def start(self, handler: Callable[[bytes, str], None]):
+    def start(self, handler: Callable[[bytes], None]):
         if not self.is_setup:
             logger.error('Listener must be set up before starting.')
             raise SetupRequiredError('Listener must be set up before starting.')
@@ -141,7 +141,7 @@ class Listener:
                 sock = key.fileobj
                 protocol = key.data
                 packet, addr = sock.recvfrom(65535)
-                handler(packet, protocol)
+                print(handler(packet))
 
     def print_raw(self, packet: bytes, protocol: str):
         logger.info(f'Received {len(packet)} bytes on protocol {protocol}, ')

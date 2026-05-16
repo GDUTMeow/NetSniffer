@@ -12,7 +12,7 @@ def main():
     listener = Listener('enp0s5')
     # listener = Listener('{016BF61E-E718-49D8-947F-4D00BF7B3A25}')
     listener.setup()
-    listener.start(handler=parser.handle_packet)
+    listener.start(handler=parser.parse)
 
 
 if __name__ == '__main__':

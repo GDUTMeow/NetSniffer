@@ -12,4 +12,11 @@ SERVICES_PORT_MAPPING = {
     6379: 'Redis',
 }
 
-__all__ = ['DNSPacket', 'HTTPPacket', 'NTPPacket', 'RedisPacket', 'FTPPacket', 'SERVICES_PORT_MAPPING']
+__all__ = [
+    'DNSPacket',
+    'HTTPPacket',
+    'NTPPacket',
+    'RedisPacket',
+    'FTPPacket',
+    'SERVICES_PORT_MAPPING',
+]
