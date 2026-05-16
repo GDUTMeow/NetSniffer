@@ -178,7 +178,11 @@ class DNSPacket:
             if idx + rdlength > len(raw):
                 raise PacketLengthNotSatisfiedError('Not enough bytes for rdata')
             rdata = raw[idx : idx + rdlength]
-            rdata_str = socket.inet_ntoa(rdata) if rtype in (1, 28) and rdlength in (4, 16) else rdata
+            rdata_str = (
+                socket.inet_ntoa(rdata)
+                if rtype in (1, 28) and rdlength in (4, 16)
+                else rdata
+            )
             idx += rdlength
             answers.append(
                 DNSRecord(
@@ -189,7 +193,6 @@ class DNSPacket:
                     rdata=rdata_str,
                 )
             )
-
 
         # Parse authority sections
         authorities: List[DNSRecord] = []
