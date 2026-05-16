@@ -27,10 +27,12 @@ class RedisSerializedPacket:
     length: int | None = None
     is_null: bool = False
 
-
+@dataclass
 class RedisPacket:
+    content: List[RedisSerializedPacket]
+
     @classmethod
-    def parse(cls, raw: bytes) -> List[RedisSerializedPacket]:
+    def parse(cls, raw: bytes) -> 'RedisPacket':
         results: List[RedisSerializedPacket] = []
         offset = 0
         while offset < len(raw):
@@ -40,7 +42,7 @@ class RedisPacket:
                 offset = next_offset
             else:
                 break
-        return results
+        return RedisPacket(content=results)
 
     @classmethod
     def _parse_one(
