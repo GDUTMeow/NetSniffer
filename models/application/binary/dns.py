@@ -1,4 +1,5 @@
 import struct
+import socket
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Tuple
@@ -112,7 +113,7 @@ class DNSRecord:
     rtype: DNSQueryType
     rclass: int
     ttl: int
-    rdata: bytes
+    rdata: bytes | str
 
 
 @dataclass
@@ -177,6 +178,7 @@ class DNSPacket:
             if idx + rdlength > len(raw):
                 raise PacketLengthNotSatisfiedError('Not enough bytes for rdata')
             rdata = raw[idx : idx + rdlength]
+            rdata_str = socket.inet_ntoa(rdata) if rtype in (1, 28) and rdlength in (4, 16) else rdata
             idx += rdlength
             answers.append(
                 DNSRecord(
@@ -184,9 +186,10 @@ class DNSPacket:
                     rtype=DNSQueryType.parse(rtype),
                     rclass=rclass,
                     ttl=ttl,
-                    rdata=rdata,
+                    rdata=rdata_str,
                 )
             )
+
 
         # Parse authority sections
         authorities: List[DNSRecord] = []

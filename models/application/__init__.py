@@ -8,6 +8,7 @@ SERVICES_PORT_MAPPING = {
     80: 'HTTP',
     21: 'FTP',
     53: 'DNS',
+    5353: 'DNS',
     123: 'NTP',
     6379: 'Redis',
 }
